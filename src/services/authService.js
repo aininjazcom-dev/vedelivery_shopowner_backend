@@ -136,7 +136,18 @@ async function login(req, res, next) {
 }
 
 async function me(req, res) {
-  return res.json({ user: req.user });
+  try {
+    const found = await pool.query('SELECT name FROM owner_staff WHERE id = $1', [req.user.sub]);
+    const name = found.rows[0]?.name || '';
+    return res.json({
+      user: {
+        ...req.user,
+        name
+      }
+    });
+  } catch (err) {
+    return res.json({ user: req.user });
+  }
 }
 
 module.exports = { signup, login, me };
