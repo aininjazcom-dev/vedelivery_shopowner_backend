@@ -2,8 +2,8 @@ const { pool } = require('../db');
 
 // Helper to query store ID for a user
 async function getStoreIdForUser(userId) {
-  const res = await pool.query('SELECT id FROM owner_stores WHERE user_id = $1', [userId]);
-  return res.rows[0]?.id;
+  const res = await pool.query('SELECT store_id FROM owner_staff WHERE id = $1', [userId]);
+  return res.rows[0]?.store_id;
 }
 
 // Seeding / first-time initialization of store details for a user
