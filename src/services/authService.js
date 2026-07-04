@@ -80,21 +80,28 @@ async function signup(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const { phone, password } = req.body;
-    console.log('*** LOGIN ATTEMPT ***', { phone, password });
+    const { password } = req.body;
+    const identifier = req.body.emailOrPhone || req.body.phone || req.body.username;
+    console.log('*** LOGIN ATTEMPT ***', { identifier, password });
 
-    if (!phone || !password) {
-      return res.status(400).json({ message: 'Phone number and password are required' });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'Email/Phone and password are required' });
     }
 
-    const normalizedPhone = normalizePhone(phone);
-    console.log('Normalized phone:', normalizedPhone);
+    let found;
+    if (identifier.includes('@')) {
+      const cleanEmail = identifier.trim().toLowerCase();
+      console.log('Querying by email:', cleanEmail);
+      found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE email=$1', [cleanEmail]);
+    } else {
+      const normalizedPhone = normalizePhone(identifier);
+      console.log('Querying by normalized phone:', normalizedPhone);
+      found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [normalizedPhone]);
+    }
 
-    // Query owner_staff directly by normalized phone
-    const found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [normalizedPhone]);
     console.log('Found rows in DB:', found.rows.length);
     if (!found.rows.length) {
-      return res.status(401).json({ message: 'Invalid phone number or password' });
+      return res.status(401).json({ message: 'Invalid credentials. Please check your username/phone and password.' });
     }
 
     const user = found.rows[0];
@@ -106,7 +113,7 @@ async function login(req, res, next) {
     const ok = await bcrypt.compare(password, user.password_hash);
     console.log('Password match status:', ok);
     if (!ok) {
-      return res.status(401).json({ message: 'Invalid phone number or password' });
+      return res.status(401).json({ message: 'Invalid credentials. Please check your username/phone and password.' });
     }
 
     const token = jwt.sign(
