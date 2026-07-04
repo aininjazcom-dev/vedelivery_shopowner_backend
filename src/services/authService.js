@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { initializeStoreData } = require('./ownerService');
 
+// Normalize phone numbers by removing all whitespaces
+const normalizePhone = (p) => p ? p.replace(/\s+/g, '') : '';
+
 async function signup(req, res, next) {
   try {
     const { email, password, firstName, lastName, phone } = req.body;
@@ -12,10 +15,12 @@ async function signup(req, res, next) {
       return res.status(400).json({ message: 'Email, password, first name, and phone number are required' });
     }
 
-    // Check if email already exists in owner_staff table
-    const existing = await pool.query('SELECT id FROM owner_staff WHERE email=$1', [email]);
+    const normalizedPhone = normalizePhone(phone);
+
+    // Check if email or normalized phone already exists in owner_staff table
+    const existing = await pool.query('SELECT id FROM owner_staff WHERE email=$1 OR phone=$2', [email, normalizedPhone]);
     if (existing.rows.length) {
-      return res.status(409).json({ message: 'Email already in use' });
+      return res.status(409).json({ message: 'Email or Phone number already in use' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -25,7 +30,7 @@ async function signup(req, res, next) {
     // 1. Initialize the store in owner_stores first to obtain storeId
     let storeId;
     try {
-      storeId = await initializeStoreData(staffId, `${firstName}'s Kitchen`, phone);
+      storeId = await initializeStoreData(staffId, `${firstName}'s Kitchen`, normalizedPhone);
     } catch (dbErr) {
       console.error('Error initializing store data on signup:', dbErr);
       return res.status(500).json({ message: 'Failed to initialize store details' });
@@ -37,7 +42,7 @@ async function signup(req, res, next) {
       `INSERT INTO owner_staff (id, store_id, name, role, status, phone, email, password_hash, permissions, joined_on)
        VALUES ($1, $2, $3, 'Owner', 'active', $4, $5, $6, $7, $8)
        RETURNING id, name, email, phone, role, joined_on`,
-      [staffId, storeId, fullName, phone, email, passwordHash, ['Menu', 'Orders', 'Settings', 'Earnings'], joinedOn]
+      [staffId, storeId, fullName, normalizedPhone, email, passwordHash, ['Menu', 'Orders', 'Settings', 'Earnings'], joinedOn]
     );
 
     const user = inserted.rows[0];
@@ -65,8 +70,10 @@ async function login(req, res, next) {
       return res.status(400).json({ message: 'Phone number and password are required' });
     }
 
-    // Query owner_staff directly by phone
-    const found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [phone]);
+    const normalizedPhone = normalizePhone(phone);
+
+    // Query owner_staff directly by normalized phone
+    const found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [normalizedPhone]);
     if (!found.rows.length) {
       return res.status(401).json({ message: 'Invalid phone number or password' });
     }
