@@ -4,12 +4,28 @@ const crypto = require('crypto');
 const { pool } = require('../db');
 const { initializeStoreData } = require('./ownerService');
 
-// Normalize phone numbers by removing all whitespaces
-const normalizePhone = (p) => p ? p.replace(/\s+/g, '') : '';
+// Normalize phone numbers by removing all whitespaces, handling duplicate country codes, and prepending +91 if needed
+const normalizePhone = (p) => {
+  if (!p) return '';
+  let clean = p.replace(/\s+/g, '');
+  while (clean.includes('+91+91')) {
+    clean = clean.replace('+91+91', '+91');
+  }
+  if (!clean.startsWith('+91')) {
+    // If it starts with 91 and has 12 digits, prepend '+'
+    if (clean.startsWith('91') && clean.length === 12) {
+      clean = '+' + clean;
+    } else if (clean.length === 10) {
+      clean = '+91' + clean;
+    }
+  }
+  return clean;
+};
 
 async function signup(req, res, next) {
   try {
     const { email, password, firstName, lastName, phone } = req.body;
+    console.log('*** SIGNUP ATTEMPT ***', { email, password, firstName, lastName, phone });
 
     if (!email || !password || !firstName || !phone) {
       return res.status(400).json({ message: 'Email, password, first name, and phone number are required' });
@@ -65,25 +81,30 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const { phone, password } = req.body;
+    console.log('*** LOGIN ATTEMPT ***', { phone, password });
 
     if (!phone || !password) {
       return res.status(400).json({ message: 'Phone number and password are required' });
     }
 
     const normalizedPhone = normalizePhone(phone);
+    console.log('Normalized phone:', normalizedPhone);
 
     // Query owner_staff directly by normalized phone
     const found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [normalizedPhone]);
+    console.log('Found rows in DB:', found.rows.length);
     if (!found.rows.length) {
       return res.status(401).json({ message: 'Invalid phone number or password' });
     }
 
     const user = found.rows[0];
+    console.log('User details:', { id: user.id, email: user.email, phone: user.phone, hasHash: !!user.password_hash });
     if (!user.password_hash) {
       return res.status(401).json({ message: 'This account is not set up for login' });
     }
 
     const ok = await bcrypt.compare(password, user.password_hash);
+    console.log('Password match status:', ok);
     if (!ok) {
       return res.status(401).json({ message: 'Invalid phone number or password' });
     }
