@@ -90,7 +90,7 @@ async function getStoreData(req, res, next) {
     const categories = (await pool.query('SELECT * FROM owner_categories WHERE store_id = $1 ORDER BY display_order ASC', [storeId])).rows;
     const menu = (await pool.query('SELECT * FROM owner_menu_items WHERE store_id = $1 ORDER BY created_at ASC', [storeId])).rows;
     const staff = (await pool.query('SELECT * FROM owner_staff WHERE store_id = $1 ORDER BY created_at ASC', [storeId])).rows;
-    const notifications = (await pool.query('SELECT * FROM owner_notifications WHERE store_id = $1 ORDER BY created_at DESC', [storeId])).slice(0, 30).rows;
+    const notifications = (await pool.query('SELECT * FROM owner_notifications WHERE store_id = $1 ORDER BY created_at DESC', [storeId])).rows.slice(0, 30);
 
     // Load orders
     const ordersRes = await pool.query('SELECT * FROM owner_orders WHERE store_id = $1 ORDER BY created_at DESC', [storeId]);
