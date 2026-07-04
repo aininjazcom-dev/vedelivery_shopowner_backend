@@ -59,26 +59,26 @@ async function signup(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
+    const { phone, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    if (!phone || !password) {
+      return res.status(400).json({ message: 'Phone number and password are required' });
     }
 
-    // Query owner_staff directly
-    const found = await pool.query('SELECT id, email, password_hash, name FROM owner_staff WHERE email=$1', [email]);
+    // Query owner_staff directly by phone
+    const found = await pool.query('SELECT id, email, phone, password_hash, name FROM owner_staff WHERE phone=$1', [phone]);
     if (!found.rows.length) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid phone number or password' });
     }
 
     const user = found.rows[0];
     if (!user.password_hash) {
-      return res.status(401).json({ message: 'This staff member account is not set up for login' });
+      return res.status(401).json({ message: 'This account is not set up for login' });
     }
 
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ message: 'Invalid phone number or password' });
     }
 
     const token = jwt.sign(
